@@ -1,0 +1,27 @@
+{
+  "name": "Sully",
+  "version": "1.0.0",
+  "description": "The official CLI for Sully.js.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type" : "git",
+    "url" : "https://github.com/alexanderpharwood/sully.git"
+},
+  "author": "Alexander P. Harwood",
+  "license": "ISC",
+  "dependencies": {
+    "colors": "^1.3.2",
+    "concat": "^1.0.3",
+    "fs-extra": "^7.0.0",
+    "jsonfile": "^5.0.0",
+    "request": "^2.88.0",
+    "uglify-js": "^3.4.9",
+    "unzip": "^0.1.11"
+  },
+  "bin": {
+    "sully": "./index.js"
+  }
+}
