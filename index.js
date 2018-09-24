@@ -10,14 +10,14 @@ const uglify = require('uglify-js');
 
 const applicationVersion = "1.0.0";
 
-const packageDownloadUrl = "https://github.com/alexanderpharwood/jcache/archive/master.zip";
+const packageDownloadUrl = "https://github.com/alexanderpharwood/sully-starter/archive/master.zip";
 const packageVersion = "1.0.0";
 
-
-var router = "";
-var controllers = "";
-var middleware = "";
-var views = "";
+var build = {};
+build.router = "";
+build.controllers = "";
+build.middleware = "";
+build.views = "";
 
 var concatonated = "";
 
@@ -40,112 +40,135 @@ switch(args[0]){
 
     case "build":
 
-     console.log("--> Starting build");
+        console.log("--> Starting build");
 
-    function errorAndExit(message){
+        function errorAndExit(message){
 
-        var messageString = "ERROR: " + message;
+            var messageString = "ERROR: " + message;
 
-        console.log(messageString.red);
+            console.log(messageString.red);
 
-        return;
+            return;
 
-    }
-
-    //load the build.json file.
-    jsonfile.readFile('build.json', function(err, buildConfig) {
-
-        if(err){
-            return errorAndExit("The 'build.json' either has an error in it or can not be found");
         }
 
-        //Compiling router
-        router = fs.readFileSync(buildConfig.router, "UTF8");
+        //load the build.json file.
+        jsonfile.readFile('build.json', function(err, buildConfig) {
 
-        //Compile middleware (optional)
-
-        //build.json middleware element is present
-        if (typeof buildConfig.middleware !== "undefined"){
-
-            console.log("--> Compiling middleware");
-
-            var middlewareArray = [];
-
-            for (var middlewareName in buildConfig.middleware){
-                middlewareArray.push(buildConfig.middleware[middlewareName]);
+            if(err){
+                return errorAndExit("The 'build.json' either has an error in it or can not be found");
             }
 
-            concat(middlewareArray).then(function(middleware){
+            //Compile router
+            if (typeof buildConfig.router === "undefined"){
+                return errorAndExit("The 'build.json' does not contain a 'router' element.");
+            }
+            build.router = fs.readFileSync(buildConfig.router, "UTF8");
 
 
-                middleware = "(function(){" + middleware + "})();";
+            //Compile middleware (optional)
+            function compileMiddleware(callback){
 
-                        //Compile views
+                if (typeof buildConfig.middleware === "undefined"){
+                    callback();
+                } else {
 
-                        //build.json views element is present
-                        if (typeof buildConfig.views === "undefined"){
-                            return errorAndExit("build.json' does not contain a 'views' element");
+                    console.log("--> Compiling middleware");
+                    var middlewareArray = [];
+
+                    for (var middlewareName in buildConfig.middleware){
+                        middlewareArray.push(buildConfig.middleware[middlewareName]);
+                    }
+
+                    concat(middlewareArray).then(function(middleware){
+                        build.middleware = "(function(){" + middleware + "})();";
+                        callback();
+                    });
+                }
+            }
+
+
+            //Compile views (required)
+            function compileViews(callback){
+
+                //build.json views element is present
+                if (typeof buildConfig.views === "undefined"){
+                    return errorAndExit("build.json' does not contain a 'views' element");
+                } else {
+                    console.log("--> Compiling views");
+                    build.views = "(function(){";
+
+                    for (var viewName in buildConfig.views){
+                        build.views += getRegisterViewCode(viewName, buildConfig.views[viewName]);
+                    }
+
+                    build.views += "})();";
+                    callback();
+                }
+            }
+
+
+            //Compile controllers
+            function compileControllers(callback){
+
+                if (typeof buildConfig.controllers === "undefined"){
+                    return errorAndExit("build.json' does not contain a 'controllers' element");
+                } else {
+                    //build.json controllers element is present
+                    console.log("--> Compiling controllers");
+
+                    var controllersArray = [];
+
+                    for (var controllerName in buildConfig.controllers){
+                        controllersArray.push(buildConfig.controllers[controllerName]);
+                    }
+
+                    concat(controllersArray).then(function(controllers){
+                        build.controllers = "(function(){" + controllers + "})();";
+                        callback();
+                    });
+                }
+            }
+
+
+            //Run the compilation methods
+            compileMiddleware(function(){
+
+                compileControllers(function(){
+
+                    compileViews(function(){
+
+                        //We will only get here if everythign has worked okay.
+
+                        concatonated = (build.router + build.controllers + build.middleware + build.views);
+
+                        //If this is a production build
+                        if(args[1] === "--prod"){
+
+                            console.log("--> Compiling production build: " + buildConfig.builds.production.output + " (minified)");
+
+                            concatonated = "(function(){" + uglify.minify(concatonated).code + "})();";
+
+                            fs.writeFileSync(buildConfig.builds.production.output, concatonated);
+
+                        } else {
+
+                            console.log("--> Compiling development build: " + buildConfig.builds.development.output + " (uncompressed)");
+
+                            fs.writeFileSync(buildConfig.builds.development.output, concatonated);
+
                         }
 
-                        console.log("--> Compiling views");
+                        console.log("Build finished successfully!".green);
+                        console.log("\n");
 
-                        var views = "(function(){";
+                    });
 
-                        for (var viewName in buildConfig.views){
-                            views += getRegisterViewCode(viewName, buildConfig.views[viewName]);
-                        }
-
-                        views += "})();";
-
-                        //Compile controllers
-
-                        //build.json controllers element is present
-                        if (typeof buildConfig.controllers === "undefined"){
-                            return errorAndExit("build.json' does not contain a 'controllers' element");
-                        }
-
-                        console.log("--> Compiling controllers");
-
-                        var controllersArray = [];
-
-                        for (var controllerName in buildConfig.controllers){
-                            controllersArray.push(buildConfig.controllers[controllerName]);
-                        }
-
-                        concat(controllersArray).then(function(controllers){
-
-                            controllers = "(function(){" + controllers + "})();";
-
-                            concatonated = router + controllers + middleware + views;
-
-                            //If this is a production build
-                            if(args[1] === "--prod"){
-
-                                console.log("--> Compiling production build: " + buildConfig.builds.production.output + " (minified)");
-
-                                var concatonated = "(function(){" + uglify.minify(concatonated).code + "})();";
-
-                                fs.writeFileSync(buildConfig.builds.production.output, concatonated);
-
-                            } else {
-
-                                console.log("--> Compiling development build: " + buildConfig.builds.development.output + " (uncompressed)");
-
-                                fs.writeFileSync(buildConfig.builds.development.output, concatonated);
-
-                            }
-
-                            console.log("Build finished successfully!".green);
-                            console.log("\n");
-
-                        });
+                });
 
             });
 
-        }
-
-    });
-
+        });
 
         break;
 
@@ -156,6 +179,10 @@ switch(args[0]){
         }
 
         console.log("--> creating new project: " + args[1]);
+
+        if(args[2] !== "starter"){
+            packageDownloadUrl = args[2];
+        }
 
         console.log("--> Downloading package from: " + packageDownloadUrl);
 

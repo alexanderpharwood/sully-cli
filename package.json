@@ -3,13 +3,19 @@
   "version": "1.0.0",
   "description": "The official CLI for Sully.js.",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "keywords": [
+    "javascript",
+    "object",
+    "mvc",
+    "framework",
+    "template",
+    "sully"
+  ],
   "repository": {
-    "type" : "git",
-    "url" : "https://github.com/alexanderpharwood/sully.git"
-},
+    "type": "git",
+    "url": "https://github.com/alexanderpharwood/sully.git"
+  },
+  "homepage": "sullyjs.org",
   "author": "Alexander P. Harwood",
   "license": "ISC",
   "dependencies": {
@@ -19,7 +25,7 @@
     "jsonfile": "^5.0.0",
     "request": "^2.88.0",
     "uglify-js": "^3.4.9",
-    "unzip": "^0.1.11"
+    "unzip": "^0.1.11",
   },
   "bin": {
     "sully": "./index.js"
