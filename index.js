@@ -7,11 +7,17 @@ const jsonfile = require('jsonfile');
 const colors = require('colors');
 const fs = require('fs-extra');
 const uglify = require('uglify-js');
+const path = require('path');
 
 const applicationVersion = "1.0.0";
 
-const packageDownloadUrl = "https://github.com/alexanderpharwood/sully-starter/archive/master.zip";
-const packageVersion = "1.0.0";
+var templateToDownload = "";
+
+//This will in the future be pulled from a json file on the website.
+const templateThemes = {};
+templateThemes.starter = "https://github.com/alexanderpharwood/sully-starter/archive/master.zip";
+
+
 
 var build = {};
 build.router = "";
@@ -180,13 +186,17 @@ switch(args[0]){
 
         console.log("--> creating new project: " + args[1]);
 
-        if(args[2] !== "starter"){
-            packageDownloadUrl = args[2];
+        if (templateThemes.hasOwnProperty(args[2])){
+            //If the template is on the official list
+            templateToDownload = templateThemes[args[2]];
+        } else {
+            //if not them download it from the given url
+            templateToDownload = args[2];
         }
 
-        console.log("--> Downloading package from: " + packageDownloadUrl);
+        console.log("--> Downloading package from: " + templateToDownload);
 
-        var downloadStream = request(packageDownloadUrl).pipe(fs.createWriteStream("sully-" + packageVersion + ".zip"));
+        var downloadStream = request(templateToDownload).pipe(fs.createWriteStream("tmp.sully.template.zip"));
         downloadStream.on('error', function(err){
             return errorAndExit(err);
         });
@@ -201,11 +211,19 @@ switch(args[0]){
                 return errorAndExit("A directory already exists with that name");
             }
 
-            fs.createReadStream("sully-" + packageVersion + ".zip").pipe(unzip.Extract({ path: "." }));
+            var extractResult = fs.createReadStream("tmp.sully.template.zip").pipe(unzip.Extract({ path: args[1] }));
 
-            console.log("--> Extract finished");
-            console.log(args[1].green + " created successfully!".green);
-            console.log("\n");
+            extractResult.on('error', function(err){
+                fs.unlinkSync("tmp.sully.template.zip");
+                return errorAndExit("The file found at the requested url either does not exist or is corrupt.");
+            });
+
+            extractResult.on('finish', function(){
+                fs.unlinkSync("tmp.sully.template.zip");
+                console.log("--> Extract finished");
+                console.log(args[1].green + " created successfully!".green);
+                console.log("\n");
+            });
 
         });
 
@@ -213,10 +231,10 @@ switch(args[0]){
 
     default:
 
-        console.log("Usage: sullyjs <command>");
+        console.log("Usage: sully <command>");
         console.log("\n");
 
-        console.log("     new <project-name>     " + "Create a new project");
+        console.log("     new <project-name> <template>    " + "Create a new project");
         console.log("\n");
 
         console.log("     build <options>     " + "   Build the project in the current directory");
