@@ -16,13 +16,12 @@ npm install
 You should be good to branch and get your dev on!
 
 
-**Build uncompressed version**
+**usage (for testing your changes)**
 ```
 sully new <project-name> <template>
 ```
 
 
-**Build production, minified version**
 ```
 Sully build <options>
 ```
