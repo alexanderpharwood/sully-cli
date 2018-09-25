@@ -1,5 +1,5 @@
 
-# Sully.js source code
+# Sully.js CLI source code
 
 This is the repository for Sully's CLI source. If you are looking to use Sully, please [check us out on npm](https://www.npmjs.com/package/sully).
 
