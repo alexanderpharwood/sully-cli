@@ -87,7 +87,7 @@ switch(args[0]){
                     }
 
                     concat(middlewareArray).then(function(middleware){
-                        build.middleware = "(function(){" + middleware + "})();";
+                        build.middleware = middleware;
                         callback();
                     });
                 }
@@ -102,13 +102,11 @@ switch(args[0]){
                     return errorAndExit("build.json' does not contain a 'views' element");
                 } else {
                     console.log("--> Compiling views");
-                    build.views = "(function(){";
 
                     for (var viewName in buildConfig.views){
                         build.views += getRegisterViewCode(viewName, buildConfig.views[viewName]);
                     }
 
-                    build.views += "})();";
                     callback();
                 }
             }
@@ -130,7 +128,7 @@ switch(args[0]){
                     }
 
                     concat(controllersArray).then(function(controllers){
-                        build.controllers = "(function(){" + controllers + "})();";
+                        build.controllers = controllers;
                         callback();
                     });
                 }
@@ -146,14 +144,14 @@ switch(args[0]){
 
                         //We will only get here if everythign has worked okay.
 
-                        concatonated = (build.router + build.controllers + build.middleware + build.views);
+                        concatonated = ('(function(){' + build.router + build.controllers + build.middleware + build.views + '})();');
 
                         //If this is a production build
                         if(args[1] === "--prod"){
 
                             console.log("--> Compiling production build: " + buildConfig.builds.production.output + " (minified)");
 
-                            concatonated = "(function(){" + uglify.minify(concatonated).code + "})();";
+                            concatonated = uglify.minify(concatonated).code;
 
                             fs.writeFileSync(buildConfig.builds.production.output, concatonated);
 
