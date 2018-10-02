@@ -18,14 +18,15 @@ The new command will pull a project template and extract it and ensure you are a
 
 **Building a project**
 ```
-$ sully build <options>
+$ sully build
 ```
-The build command will compile your controllers, middleware, and views. The "--prod" flag is optional, and will minify and compile the build to your specified production location. If the "--prod" flag is not specified, the build will not be minified and will be compiled to your specified development location.
+The build command will compile your controllers, middleware, views, and routes. It will build a development and a production version, which will both be written to your specified locations in build.json.
 
-## Contributing
+**the autobuilder**
+```
+$ sully autobuilder <path> <options>
+```
+The autobuilder will listen for changes and perform automatic builds. The path parameter is option, and will tell the autobuilder to listen for changes only in the specified file or directory. If no path is specified, the autobuilder will listen for changes in all files.
 
-Please just clone and submit a pull request!
 
-
-
-The website is coming soon!
+For all things Sully: [sullyjs.org](https://sullyjs.org)
