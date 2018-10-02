@@ -8,8 +8,10 @@ const colors = require('colors');
 const fs = require('fs-extra');
 const uglify = require('uglify-js');
 const path = require('path');
+const exec = require('child_process').exec;
+const chokidar = require('chokidar');
 
-const applicationVersion = "1.0.0";
+const applicationVersion = "1.0.5";
 
 var templateToDownload = "";
 
@@ -146,24 +148,16 @@ switch(args[0]){
 
                         concatonated = ('(function(){' + build.router + build.controllers + build.middleware + build.views + '})();');
 
-                        //If this is a production build
-                        if(args[1] === "--prod"){
+                        //Write uncompressed to disk
+                        console.log("--> Compiling development build: " + buildConfig.builds.development.output + " (uncompressed)");
+                        fs.writeFileSync(buildConfig.builds.development.output, concatonated);
 
-                            console.log("--> Compiling production build: " + buildConfig.builds.production.output + " (minified)");
+                        //Write compressed to disk
+                        console.log("--> Compiling production build: " + buildConfig.builds.production.output + " (compressed)");
+                        concatonated = uglify.minify(concatonated).code;
+                        fs.writeFileSync(buildConfig.builds.production.output, concatonated);
 
-                            concatonated = uglify.minify(concatonated).code;
-
-                            fs.writeFileSync(buildConfig.builds.production.output, concatonated);
-
-                        } else {
-
-                            console.log("--> Compiling development build: " + buildConfig.builds.development.output + " (uncompressed)");
-
-                            fs.writeFileSync(buildConfig.builds.development.output, concatonated);
-
-                        }
-
-                        console.log("Build finished successfully!".green);
+                        console.log("🎉   Build finished successfully!   🎉".green);
                         console.log("\n");
 
                     });
@@ -226,6 +220,45 @@ switch(args[0]){
         });
 
         break;
+
+    case "autobuilder":
+
+        //load the build.json file.
+        jsonfile.readFile('build.json', function(err, buildConfig) {
+
+            if(err){
+                return errorAndExit("The 'build.json' either has an error in it or can not be found");
+            }
+
+            var listen = path.resolve() + "/";
+
+            //if they have specified a directory to listen on
+            if(typeof args[1] !== "undefined"){
+
+                if (!fs.existsSync(args[1])){
+                    return errorAndExit(args[1] + " does not exist.");
+                }
+
+                listen += args[1];
+
+            }
+
+            console.log("--> Listening for changes: " + listen);
+
+            chokidar.watch(listen, {ignored: [/(^|[\/\\])\../, new RegExp(buildConfig.builds.production.output), new RegExp(buildConfig.builds.development.output)]}).on('change', (event, path) => {
+
+                exec('Sully build', (error, stdout, stderr) => {
+
+                        console.log(stdout);
+                        console.log('--> Still listening...');
+
+                    });
+            });
+
+        });
+
+        break;
+
 
     default:
 

@@ -1,6 +1,6 @@
 {
   "name": "sully",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "The official CLI for Sully.js.",
   "main": "index.js",
   "keywords": [
@@ -19,6 +19,7 @@
   "author": "Alexander P. Harwood",
   "license": "ISC",
   "dependencies": {
+    "chokidar": "^2.0.4",
     "colors": "^1.3.2",
     "concat": "^1.0.3",
     "fs-extra": "^7.0.0",
