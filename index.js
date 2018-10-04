@@ -10,8 +10,9 @@ const uglify = require('uglify-js');
 const path = require('path');
 const exec = require('child_process').exec;
 const chokidar = require('chokidar');
+const express = require('express');
 
-const applicationVersion = "1.0.5";
+const applicationVersion = "1.0.7";
 
 var templateToDownload = "";
 
@@ -250,6 +251,7 @@ switch(args[0]){
                 exec('Sully build', (error, stdout, stderr) => {
 
                         console.log(stdout);
+                        console.log(stderr);
                         console.log('--> Still listening...');
 
                     });
@@ -258,6 +260,54 @@ switch(args[0]){
         });
 
         break;
+
+    case "serve":
+
+    jsonfile.readFile('build.json', function(err, buildConfig) {
+
+        if(err){
+            return errorAndExit("The 'build.json' either has an error in it or can not be found");
+        }
+
+        var port = 3000;
+        var app = express();
+
+        if(typeof buildConfig.serveIgnoreRoutePaths !== "undefined"){
+
+            for (var key in buildConfig.serveIgnoreRoutePaths){
+                app.get('*/' + buildConfig.serveIgnoreRoutePaths[key] + '/*', express.static(path.resolve()));
+            }
+
+        } else {
+            app.get('*/app/*', express.static(path.resolve()));
+            app.get('*/vendor/*', express.static(path.resolve()));
+        }
+
+        //Any files which arent found will fall back to 404 adn thus be router tp index.html
+        //where sully will handle the 404 page.
+
+        app.all('/*', function(req, res, next) {
+            // Just send the index.html for other files to support HTML5Mode
+            res.sendFile('index.html', { root: path.resolve() });
+        });
+
+        if (typeof args[1] !== "undefined" ){
+
+            if (Number.isInteger(parseInt(args[1]))) {
+                port = args[1];
+            } else {
+                console.log(args[1] + " is not a valid port number!");
+            }
+
+        }
+
+        app.listen(port);
+
+        console.log("--> Sully dev server running at: http://localhost:".green + port.toString().green);
+
+    });
+
+    break;
 
 
     default:
