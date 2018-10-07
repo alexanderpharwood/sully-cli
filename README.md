@@ -34,5 +34,11 @@ $ sully serve <port>
 ```
 Sully will spin up a local Express server on your machine. The port parameter is option and must be an integer. If no port is provided, the server will listen on 3000.
 
+**Releases**
+```
+$ sully release
+```
+Create a release as per the details provided in your build.json.
+
 
 For all things Sully: [sullyjs.org](https://sullyjs.org)

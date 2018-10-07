@@ -11,8 +11,9 @@ const path = require('path');
 const exec = require('child_process').exec;
 const chokidar = require('chokidar');
 const express = require('express');
+const archiver = require('archiver');
 
-const applicationVersion = "1.0.7";
+const applicationVersion = "1.0.8";
 
 var templateToDownload = "";
 
@@ -20,13 +21,12 @@ var templateToDownload = "";
 const templateThemes = {};
 templateThemes.starter = "https://github.com/alexanderpharwood/sully-starter/archive/master.zip";
 
-
-
 var build = {};
 build.router = "";
 build.controllers = "";
 build.middleware = "";
 build.views = "";
+build.customScripts = "";
 
 var concatonated = "";
 
@@ -69,24 +69,23 @@ switch(args[0]){
             }
 
             //Compile router
-            if (typeof buildConfig.router === "undefined"){
+            if (typeof buildConfig.build.router === "undefined"){
                 return errorAndExit("The 'build.json' does not contain a 'router' element.");
             }
-            build.router = fs.readFileSync(buildConfig.router, "UTF8");
-
+            build.router = fs.readFileSync(buildConfig.build.router, "UTF8");
 
             //Compile middleware (optional)
             function compileMiddleware(callback){
 
-                if (typeof buildConfig.middleware === "undefined"){
+                if (typeof buildConfig.build.middleware === "undefined"){
                     callback();
                 } else {
 
                     console.log("--> Compiling middleware");
                     var middlewareArray = [];
 
-                    for (var middlewareName in buildConfig.middleware){
-                        middlewareArray.push(buildConfig.middleware[middlewareName]);
+                    for (var middlewareName in buildConfig.build.middleware){
+                        middlewareArray.push(buildConfig.build.middleware[middlewareName]);
                     }
 
                     concat(middlewareArray).then(function(middleware){
@@ -101,13 +100,13 @@ switch(args[0]){
             function compileViews(callback){
 
                 //build.json views element is present
-                if (typeof buildConfig.views === "undefined"){
+                if (typeof buildConfig.build.views === "undefined"){
                     return errorAndExit("build.json' does not contain a 'views' element");
                 } else {
                     console.log("--> Compiling views");
 
-                    for (var viewName in buildConfig.views){
-                        build.views += getRegisterViewCode(viewName, buildConfig.views[viewName]);
+                    for (var viewName in buildConfig.build.views){
+                        build.views += getRegisterViewCode(viewName, buildConfig.build.views[viewName]);
                     }
 
                     callback();
@@ -118,7 +117,7 @@ switch(args[0]){
             //Compile controllers
             function compileControllers(callback){
 
-                if (typeof buildConfig.controllers === "undefined"){
+                if (typeof buildConfig.build.controllers === "undefined"){
                     return errorAndExit("build.json' does not contain a 'controllers' element");
                 } else {
                     //build.json controllers element is present
@@ -126,8 +125,8 @@ switch(args[0]){
 
                     var controllersArray = [];
 
-                    for (var controllerName in buildConfig.controllers){
-                        controllersArray.push(buildConfig.controllers[controllerName]);
+                    for (var controllerName in buildConfig.build.controllers){
+                        controllersArray.push(buildConfig.build.controllers[controllerName]);
                     }
 
                     concat(controllersArray).then(function(controllers){
@@ -135,6 +134,34 @@ switch(args[0]){
                         callback();
                     });
                 }
+            }
+
+            //Compile custom scripts
+            function compileCustomScripts(callback){
+
+                //If add any additional scripts defined in build.jsonfile
+                if (buildConfig.build.scripts.constructor === Array && buildConfig.build.scripts.length){
+
+                    //build.json controllers element is present
+                    console.log("--> Compiling custom scripts");
+
+                    var scriptsArray = [];
+
+                    for (var scriptName in buildConfig.build.scripts){
+                        scriptsArray.push(buildConfig.build.scripts[scriptName]);
+                    }
+
+                    concat(scriptsArray).then(function(scripts){
+                        build.scripts = scripts;
+                        callback();
+                    });
+
+                } else {
+
+                    callback();
+
+                }
+
             }
 
 
@@ -145,21 +172,34 @@ switch(args[0]){
 
                     compileViews(function(){
 
-                        //We will only get here if everythign has worked okay.
+                        compileCustomScripts(function(){
 
-                        concatonated = ('(function(){' + build.router + build.controllers + build.middleware + build.views + '})();');
+                            compileCustomScripts
 
-                        //Write uncompressed to disk
-                        console.log("--> Compiling development build: " + buildConfig.builds.development.output + " (uncompressed)");
-                        fs.writeFileSync(buildConfig.builds.development.output, concatonated);
+                            //We will only get here if everythign has worked okay.
 
-                        //Write compressed to disk
-                        console.log("--> Compiling production build: " + buildConfig.builds.production.output + " (compressed)");
-                        concatonated = uglify.minify(concatonated).code;
-                        fs.writeFileSync(buildConfig.builds.production.output, concatonated);
+                            concatonated = ('(function(){' +
+                                build.router +
+                                build.controllers +
+                                build.middleware +
+                                build.views +
+                                build.scripts +
+                                '})();');
 
-                        console.log("🎉   Build finished successfully!   🎉".green);
-                        console.log("\n");
+                            //Write uncompressed to disk
+                            console.log("--> Compiling development build (uncompressed)");
+                            fs.writeFileSync(buildConfig.build.output, concatonated);
+
+                            //Write compressed to disk
+                            console.log("--> Compiling production build (compressed)");
+                            concatonated = uglify.minify(concatonated).code;
+                            var compressedFileName = buildConfig.build.output.substr(0, buildConfig.build.output.length - 3) + '.min.js';
+                            fs.writeFileSync(compressedFileName, concatonated);
+
+                            console.log("🎉   Build finished successfully!   🎉".green);
+                            console.log("\n");
+
+                        });
 
                     });
 
@@ -231,14 +271,29 @@ switch(args[0]){
                 return errorAndExit("The 'build.json' either has an error in it or can not be found");
             }
 
+            //Default to listen for all files
             var listen = path.resolve() + "/";
 
-            //if they have specified a directory to listen on
+            //if they have specified a directory to listen on via the build.json file
+            if (typeof buildConfig.autobuilder !== "undefined" && typeof buildConfig.autobuilder.path !== "undefined"){
+
+                if (!fs.existsSync(path.resolve() + '/' + buildConfig.autobuilder.path)){
+                    return errorAndExit(buildConfig.autobuilder.path + " does not exist.");
+                }
+
+                listen += buildConfig.autobuilder.path;
+
+            }
+
+            //if they have specified a directory to listen on via the command line, take this over the build.json definition
             if(typeof args[1] !== "undefined"){
 
-                if (!fs.existsSync(args[1])){
+                if (!fs.existsSync(path.resolve() + args[1])){
                     return errorAndExit(args[1] + " does not exist.");
                 }
+
+                //Reset in case the yhave defined a path in build,sjon too
+                var listen = path.resolve()  + "/";
 
                 listen += args[1];
 
@@ -246,7 +301,19 @@ switch(args[0]){
 
             console.log("--> Listening for changes: " + listen);
 
-            chokidar.watch(listen, {ignored: [/(^|[\/\\])\../, new RegExp(buildConfig.builds.production.output), new RegExp(buildConfig.builds.development.output)]}).on('change', (event, path) => {
+            var ignorePaths = [];
+
+            ignorePaths.push(/(^|[\/\\])\../);
+
+            if (typeof buildConfig.autobuilder.ignore !== "undefined"){
+
+                for (var i in buildConfig.autobuilder.ignore){
+
+                    ignorePaths.push(new RegExp('(.*)?' + buildConfig.autobuilder.ignore[i] + '(.*)?'));
+                }
+            }
+
+            chokidar.watch(listen, { ignored: ignorePaths }).on('change', (event, path) => {
 
                 exec('Sully build', (error, stdout, stderr) => {
 
@@ -272,15 +339,14 @@ switch(args[0]){
         var port = 3000;
         var app = express();
 
-        if(typeof buildConfig.serveIgnoreRoutePaths !== "undefined"){
+        if(typeof buildConfig.serve !== "undefined" && typeof buildConfig.serve.staticPaths !== "undefined"){
 
-            for (var key in buildConfig.serveIgnoreRoutePaths){
-                app.get('*/' + buildConfig.serveIgnoreRoutePaths[key] + '/*', express.static(path.resolve()));
+            for (var key in buildConfig.serve.staticPaths){
+                app.get('*/' + buildConfig.serve.staticPaths[key] + '/*', express.static(path.resolve()));
             }
 
         } else {
             app.get('*/app/*', express.static(path.resolve()));
-            app.get('*/vendor/*', express.static(path.resolve()));
         }
 
         //Any files which arent found will fall back to 404 adn thus be router tp index.html
@@ -296,9 +362,15 @@ switch(args[0]){
             if (Number.isInteger(parseInt(args[1]))) {
                 port = args[1];
             } else {
-                console.log(args[1] + " is not a valid port number!");
+                console.log(args[1] + " is not a valid port number");
             }
 
+        } else if (typeof buildConfig.serve.port !== "undefined"){
+            if (Number.isInteger(parseInt(buildConfig.serve.port))) {
+                port = buildConfig.serve.port;
+            } else {
+                console.log(buildConfig.serve.port + " is not a valid port number, in build.json");
+            }
         }
 
         app.listen(port);
@@ -309,6 +381,73 @@ switch(args[0]){
 
     break;
 
+    case "release":
+
+        jsonfile.readFile('build.json', function(err, buildConfig) {
+
+            if (err){
+                return errorAndExit("The 'build.json' either has an error in it or can not be found");
+            }
+
+            var archive  = archiver('zip');
+
+            try {
+
+                fs.lstatSync('releases');
+
+            } catch (err) {
+
+                fs.mkdir('releases');
+
+            }
+
+            var output = fs.createWriteStream(path.resolve() + '/releases/' + buildConfig.release.version + '.zip');
+
+            archive.pipe(output);
+
+            if (typeof buildConfig.release === "undefined"){
+
+                errorAndExit("No 'release' parameter found in build.json");
+
+            }
+
+            if (typeof buildConfig.release.include === "undefined"){
+
+                errorAndExit("No 'include' parameter found in 'release' in build.json");
+
+            }
+
+            for (i = 0; i < buildConfig.release.include.length; i++){
+
+                var relPath = buildConfig.release.include[i];
+
+                if (fs.lstatSync(relPath).isDirectory()){
+
+                    archive.directory(relPath, { name: relPath});
+
+                } else if (fs.lstatSync(relPath).isFile()){
+
+                    archive.file(relPath, { name: relPath});
+
+                }
+
+            }
+
+            archive.on('error', function(err) {
+              throw err;
+            });
+
+            archive.on('finish', function(err) {
+
+                console.log(("Release " + buildConfig.release.version + " successfully compiled!").green);
+
+            });
+
+            archive.finalize();
+
+        });
+
+        break;
 
     default:
 
